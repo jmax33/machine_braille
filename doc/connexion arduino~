@@ -1,0 +1,7 @@
+connexion arduino 
+1 GND
+2 Vcc
+3 counter RST (15)
+4 counter clk (14)
+5 Registre clk (11)
+
