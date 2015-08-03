@@ -1,0 +1,184 @@
+#define CPT_RST 8
+#define CPT_CLK 9
+
+#define CPT_DELAY 500
+#define CPT_MAX 7
+
+#define REG_INPUT 11
+#define REG_CLK  13
+#define REG_OUTPUT 10
+#define REG_MAX 24
+
+#define PITCH_TIME 10
+
+/*
+table de correspondances :
+
+a = 100000
+b = 110000
+c = 100100
+d = 100110
+e = 100010
+f = 110100
+g = 110110
+h = 110010
+i = 010100
+j = 010110
+
+k = 101000
+l = 111000
+m = 101100
+n = 101110
+o = 101010
+p = 111100
+q = 111110
+r = 111010
+s = 011100
+t = 011110
+
+u = 101001
+v = 111001
+x = 101101
+y = 101111
+z = 101011
+
+w = 010111
+
+*/
+
+#define NB_LETTER_BRAILLE 12
+#define NB_CARAC ('z'-'a') + 1 //add espace
+#define LEN_BRAILLE 7
+char tabAlphaBraille[NB_CARAC][LEN_BRAILLE] = 
+{
+  "100000", //a 
+  "110000", //b
+  "100100", //c
+  "100110", //d
+  "100010", //e
+  "110100", //f
+  "110110", //g
+  "110010", //h
+  "010100", //i
+  "010110", //J
+  "101000", //k
+  "111000", //l
+  "101100", //m
+  "101110", //n
+  "101010", //o
+  "111100", //p
+  "111110", //q
+  "111010", //r
+  "011100", //s
+  "011110", //t
+  "101001", //u
+  "111001", //v
+  "010111", //w
+  "101101", //x
+  "101111", //y
+  "101011" //z
+};
+
+char SpaceBraille[LEN_BRAILLE] = "000000";
+
+void SetState(int OutPut,int State)
+{
+  digitalWrite(OutPut,State);
+  delay(PITCH_TIME);
+}
+
+void SendPitch (int OutPut)
+{
+  SetState(OutPut,HIGH);
+  SetState(OutPut,LOW);
+}
+
+
+void InitCpt()
+{
+  pinMode(CPT_RST, OUTPUT);   
+  pinMode(CPT_CLK, OUTPUT);   
+  digitalWrite(CPT_CLK,LOW);
+  SetState(CPT_RST,LOW);
+  SendPitch(CPT_RST);
+}
+
+void InitReg()
+{
+  int i;
+  
+  pinMode(REG_INPUT, OUTPUT);
+  pinMode(REG_CLK, OUTPUT);   
+  pinMode(REG_OUTPUT, OUTPUT); 
+  
+  digitalWrite(REG_INPUT,LOW);
+  digitalWrite(REG_CLK,LOW);
+  SetState(REG_OUTPUT,LOW);
+
+  for (i=0; i<REG_MAX ; i++)
+  {
+    SendPitch(REG_CLK);
+  }
+  SendPitch(REG_OUTPUT);  
+}
+
+void setup()
+{
+
+  Serial.begin(9600);
+
+  InitCpt();
+  InitReg();
+}
+
+
+char *MyString ="hello";
+int state[2] = {LOW,HIGH};
+
+#define GET_LETTER_INDEX(_l) ((_l)-'a')
+void loop()
+{
+
+  unsigned int cptVal;
+  unsigned int RegVal;
+  unsigned int LenString;
+  
+  LenString = strlen(MyString);
+  
+  //prepare substring
+  while (LenString > 0)
+  {
+    unsigned int CurrentSize;
+    char CurrentString[NB_LETTER_BRAILLE] = {0};
+    
+    CurrentSize = LenString > NB_LETTER_BRAILLE?NB_LETTER_BRAILLE:LenString;
+    LenString -= CurrentSize;
+    
+    memcpy(CurrentString,MyString,CurrentSize);
+  
+    SendPitch(CPT_RST);
+    for (cptVal = 0 ; cptVal< LEN_BRAILLE ; cptVal++)
+    {//move ligne
+      while( CurrentSize > 0)
+      { //preprare col
+	char CurrentLetter = CurrentString[CurrentSize -1 ];
+	char *pBrailleCode;
+	if (CurrentLetter <= 'a' && CurrentLetter >= 'z')
+	{
+	  pBrailleCode = tabAlphaBraille[GET_LETTER_INDEX(CurrentLetter)];
+	}
+	else
+	{//special carac
+	  pBrailleCode = SpaceBraille;
+	}
+
+	CurrentSize --;
+	SetState(REG_INPUT,state[pBrailleCode[cptVal]-'0']);
+	SendPitch(REG_CLK);
+	
+      }
+      SendPitch(REG_OUTPUT);
+      SendPitch(CPT_CLK);
+    }
+  }
+}
